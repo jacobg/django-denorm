@@ -3,9 +3,10 @@
 This project is to be used on Google App Engine in conjunction with Django App Engine or Djangae projects to automatically add denormalized fields to configured models and update them. When source model instances are saved, it will kick off a task using either MapReduce or cursor-based batch updates to target models.
 
 Additional features include:
-1) throttling
+1) denormalize either ForeignKey or ForeignKey lists fields
 2) only denormalize if an affected value changed
-3) special parameters you can use to require or disable denormalization on any particular model save, which is useful for migration setup and user override.
+3) throttling
+4) special parameters you can use to require or disable denormalization on any particular model save, which is useful for migration setup and user override.
 
 To use this application:
 1) Add the denorm directory to your project.
@@ -29,10 +30,14 @@ To configure denormalization on an application's model(s), add a denorm_fields.p
 	            'throttles': ['4/min', '25/hour', '50/day']
 	        },
 
-	        'job': {
+	        'jobs': {
 	            'strategy': 'mapreduce',
 	            'shards': util.shard_count_related,
 	            'fields': ['name'],
+	            # will store denormalized job data in a denorm_data JSONField keyed by job primary key
+	            'storage': 'shared_dict',
+	            # specify model, because list field is currently list of integers rather than list of ForeignKeys
+    	        'model': costing_models.Job,
 	            'label': util.denorm_label,
 	            'throttles': ['2/min', '10/hour', '20/day']
 	        },
