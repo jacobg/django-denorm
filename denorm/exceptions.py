@@ -1,0 +1,4 @@
+
+class DenormThrottled(Exception):
+
+    pass
