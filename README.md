@@ -30,11 +30,12 @@ To configure denormalization on an application's model(s), add a denorm_fields.p
 	            'throttles': ['4/min', '25/hour', '50/day']
 	        },
 
-	        'jobs': {
+	        'job': {
 	            'strategy': 'mapreduce',
 	            'shards': util.shard_count_related,
 	            'fields': ['name'],
-	            # will store denormalized job data in a denorm_data JSONField keyed by job primary key
+	            # shared_dict storage indicates that target model contains list of foreign keys.
+	            # will store denormalized data in a denorm_data JSONField keyed by source primary key.
 	            'storage': 'shared_dict',
 	            # specify model, because list field is currently list of integers rather than list of ForeignKeys
     	        'model': costing_models.Job,
