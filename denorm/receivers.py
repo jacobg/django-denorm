@@ -4,9 +4,11 @@ import json, logging
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 from google.appengine.api import taskqueue
 from inflector.inflector import Inflector
+from json_field.fields import JSONEncoder
 from mapreduce.util import handler_for_name
 
 from denorm import core, exceptions, middleware, models, signals, util
@@ -86,7 +88,11 @@ def target_model_pre_save(sender, instance, raw, using, update_fields, **kwargs)
 
                 if force_denorm or created or source_pk != orig_sources[source_field]:
 
-                    source_instance = getattr(target_instance,  source_field)
+                    try:
+                        source_instance = getattr(target_instance,  source_field)
+                    except ObjectDoesNotExist:
+                        # uh oh, let's skip it
+                        continue
 
                     for field in fields:
                         source_field_value = getattr(source_instance, field) if source_instance else None
@@ -247,7 +253,7 @@ def source_model_pre_save(sender, instance, raw, using, update_fields, **kwargs)
         num_requests, duration = util.parse_rate(throttle)
 
         # FIXME: this is a naive, inefficient implementation. we should cache task counts.
-        if models.Task.objects.filter(label=label, created__gt=now - timedelta(seconds=duration)).count() >= num_requests:
+        if models.get_task_model().objects.filter(label=label, created__gt=now - timedelta(seconds=duration)).count() >= num_requests:
             raise exceptions.DenormThrottled
 
 
@@ -302,17 +308,22 @@ def source_model_post_save(sender, instance, created, **kwargs):
 
         util.delete_tasks_by_tag(tag)
 
+        payload_string = json.dumps(payload, cls=JSONEncoder) # use special encoder to handle Decimal
+
+        #print('[denorm source_model_post_save] queue task payload = %s' % payload_string)
+
+        # create a pull task per target
         taskqueue.Queue('pull-denorm').add(
-            taskqueue.Task(payload=json.dumps(payload), tag=tag, method='PULL', countdown=DENORM_DELAY_SECONDS)
+            taskqueue.Task(payload=payload_string, tag=tag, method='PULL', countdown=DENORM_DELAY_SECONDS)
         )
 
-        # create a Task model instance used to track denorm tasks, particularly for throttling
-        models.Task(
-            source_model=util.get_model_name(source_model),
-            source_instance_id=source_instance.id,
-            user=source_instance._denorm_user,
-            label=source_instance._denorm_label
-        ).save()
+    # create ** one ** Task model instance used to track denorm tasks per source, particularly for throttling
+    models.get_task_model().objects.create(
+        source_model=util.get_model_name(source_model),
+        source_instance_id=source_instance.id,
+        user=source_instance._denorm_user,
+        label=source_instance._denorm_label
+    )
 
     # re-run post_init to reset _denorm_orig_values in case this instance gets saved again
     source_model_post_init(source_model, source_instance)

@@ -8,6 +8,7 @@ from google.appengine.ext import deferred
 from .strategies import cursor, map_reduce
 from . import util
 
+# lease errors only retried up to a minute, because cron task runs every minute anyway
 LEASE_TASKS_MAX_ATTEMPTS = 3
 LEASE_TASKS_BACKOFF_SECONDS = 15 # this value will be doubled on every subsequent retry
 
@@ -43,6 +44,9 @@ def setup_denorm_task(attempts):
         tag = task.tag
 
         payload = json.loads(task.payload)
+
+        #print('[setup_denorm_task] payload = %s' % payload)
+
         strategy = payload['strategy']
 
         # TODO: use pipeline api

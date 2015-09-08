@@ -13,7 +13,8 @@ To use this application:
 2) In project settings, add it to INSTALLED_APPS.
 3) In project settings, add the middleware LocalUserMiddleware to MIDDLEWARE_CLASSES. This middleware is used to add request.user as thread-local global variable for denorm throttling. If there is no request or authentication non-superuser user, then throttling will not be applied.
 4) Add denorm.urls to your project root urls.
-5) Currently requires django-autoload project to automatically register denormalization models (https://bitbucket.org/twanschik/django-autoload/)
+5) Currently requires django-autoload project to automatically register denormalization models (https://bitbucket.org/twanschik/django-autoload/).
+Also requires json-fields (https://github.com/derek-schaefer/django-json-field).
 
 To configure denormalization on an application's model(s), add a denorm_fields.py file to your application with your model registrations. An example:
 

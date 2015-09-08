@@ -85,14 +85,14 @@ def denorm_instance(payload):
     fields = payload['fields']
     storage = payload['storage']
 
-    if storage == 'cursor':
+    if storage == 'scalar':
         related_field_name_filter = related_field_name+'_id'
         denorm_values = fields
     else:
         assert(storage == 'shared_dict')
 
         # will look up source primary key in target's list field
-        related_field_name_filter = Inflector.pluralize(related_field_name)
+        related_field_name_filter = Inflector().pluralize(related_field_name)
 
         denorm_values = {
             'denorm_data': {

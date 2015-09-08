@@ -23,13 +23,13 @@ def _copy_field(field, field_name, owner_model_name):
     if hasattr(field, "model"):
         del clone.model
 
-        # clear .name and .verbose_name, so that field name passed in contribute_to_class call gets used
+        # clear .name, .db_column and .verbose_name, so that field name passed in contribute_to_class call gets used
         clone.name = field_name
+        clone.db_column = None
         clone.verbose_name = None
 
         # TODO: remove the following setting of attributes
         #clone.attname = field_name
-        #clone.db_column = field_name
         #clone.column = field_name
 
         if hasattr(clone, '_related_fields'):
@@ -69,7 +69,7 @@ def register(target_model, options):
 
     for source, source_dict in options['sources'].iteritems():
 
-        strategy = source_dict.get('strategy', 'cursor'), # options are: [cursor, mapreduce]. defaults to cursor.
+        strategy = source_dict.get('strategy', 'cursor') # options are: [cursor, mapreduce]. defaults to cursor.
 
         # TODO: support storage options 'list' and 'dict'
         storage = source_dict.get('storage', 'scalar') # choices: [scalar, shared_dict]
