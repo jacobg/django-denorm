@@ -1,10 +1,11 @@
 
-import logging
+import json, logging
 
-from django.db.models.loading import get_model
 from django.conf import settings
+from django.db.models.loading import get_model
 from django.http import HttpResponseNotFound
 from google.appengine.api import taskqueue
+from json_field.fields import JSONEncoder
 
 def get_model_by_name(name):
 
@@ -59,3 +60,8 @@ def require_task_access(func):
 
         return func(request, *args, **kwargs)
     return wrapper
+
+
+def dump_json(data):
+
+    return json.dumps(data, cls=JSONEncoder) # use special encoder to handle Decimal

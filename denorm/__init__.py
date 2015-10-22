@@ -117,7 +117,7 @@ def register(target_model, options):
 
         # register signals for source. use dispatch_uid to prevent duplicates.
         db_signals.post_init.connect(receivers.source_model_post_init, sender=source_model, dispatch_uid='denorm_source_%s_post_init'%source)
-        db_signals.post_save.connect(receivers.source_model_pre_save, sender=source_model, dispatch_uid='denorm_source_%s_pre_save'%source)
+        db_signals.pre_save.connect(receivers.source_model_pre_save, sender=source_model, dispatch_uid='denorm_source_%s_pre_save'%source)
         db_signals.post_save.connect(receivers.source_model_post_save, sender=source_model, dispatch_uid='denorm_source_%s_post_save'%source)
 
         # FIXME: it's quirky that label and throttles must be configured under each target-source in app's denorm_fields,

@@ -2,13 +2,11 @@
 from datetime import timedelta
 import json, logging
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 from google.appengine.api import taskqueue
 from inflector.inflector import Inflector
-from json_field.fields import JSONEncoder
 from mapreduce.util import handler_for_name
 
 from denorm import core, exceptions, middleware, models, signals, util
@@ -113,7 +111,9 @@ def target_model_pre_save(sender, instance, raw, using, update_fields, **kwargs)
                 # we'll build up new_source_denorm_data as we iterate the list field
                 denorm_data[source_list_field_name] = new_source_denorm_data = {}
 
-                for source_pk in source_list_field:
+                # when iterating source list, convert pk to string b/c denorm_data keys are converted to string when
+                # dumped into json string
+                for source_pk in map(lambda pk: str(pk), source_list_field):
                     if force_denorm or created or source_pk not in source_denorm_keys:
                         # TODO: do we want to allow target model to provide any possibly already-loaded source instances to avoid extra lookups?
                         source_instance = source_model.objects.get(id=source_pk)
@@ -256,8 +256,6 @@ def source_model_pre_save(sender, instance, raw, using, update_fields, **kwargs)
         if models.get_task_model().objects.filter(label=label, created__gt=now - timedelta(seconds=duration)).count() >= num_requests:
             raise exceptions.DenormThrottled
 
-
-DENORM_DELAY_SECONDS = 60 if not settings.DEBUG else 1
 DEFAULT_MAP_REDUCE_SHARDS = 3
 
 def source_model_post_save(sender, instance, created, **kwargs):
@@ -287,11 +285,12 @@ def source_model_post_save(sender, instance, created, **kwargs):
 
         #logging.info('affected target %s.%s for source %s: %s' % (target_model, related_field_name, source_model, affected_fields))
 
-        # for each affected target, delete existing tasks and create new one
+        # for each affected target, create a separate task
 
         instance_id = source_instance.id
         tag = 'DENORM_SOURCE_%s_%s_TARGET_%s' % (util.get_model_name(source_model), instance_id, util.get_model_name(target_model))
         payload = {
+            'created': timezone.now().isoformat(),
             'strategy': strategy,
             'storage': storage,
             'instance_id': instance_id,
@@ -306,15 +305,13 @@ def source_model_post_save(sender, instance, created, **kwargs):
         if strategy == 'mapreduce':
             payload['shards'] = handler_for_name(shards)(source_instance) if shards else DEFAULT_MAP_REDUCE_SHARDS
 
-        util.delete_tasks_by_tag(tag)
+        payload_string = util.dump_json(payload)
 
-        payload_string = json.dumps(payload, cls=JSONEncoder) # use special encoder to handle Decimal
-
-        #print('[denorm source_model_post_save] queue task payload = %s' % payload_string)
+        logging.info('[denorm source_model_post_save] queue task payload = %s' % payload_string)
 
         # create a pull task per target
         taskqueue.Queue('pull-denorm').add(
-            taskqueue.Task(payload=payload_string, tag=tag, method='PULL', countdown=DENORM_DELAY_SECONDS)
+            taskqueue.Task(payload=payload_string, tag=tag, method='PULL')
         )
 
     # create ** one ** Task model instance used to track denorm tasks per source, particularly for throttling
